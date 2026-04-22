@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0f1e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>RideGuard – Safety Command Center</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- Libraries -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- SPLASH SCREEN OVERLAY -->
+  <div id="splashOverlay" class="splash-overlay" aria-hidden="true">
+    <img src="Assets/Logo.png" alt="RideGuard" class="splash-logo" />
+  </div>
+
+
+  <!-- ===================== TOP STICKY STATUS BAR ===================== -->
+  <header class="status-bar" id="statusBar">
+    <div class="status-brand">
+      <span class="brand-icon"><i class="fa-solid fa-shield-halved"></i></span>
+      <span class="brand-name">RIDEGUARD</span>
+    </div>
+    <div class="status-indicators">
+      <!-- SIM / Signal -->
+      <div class="status-pill" id="simStatus" title="GSM Signal">
+        <i class="fa-solid fa-signal"></i>
+        <span id="signalText">4G</span>
+      </div>
+      <!-- GPS -->
+      <div class="status-pill" id="gpsStatus" title="GPS Lock">
+        <i class="fa-solid fa-location-dot"></i>
+        <span id="gpsText">FIX</span>
+      </div>
+      <!-- Battery -->
+      <div class="status-pill" id="batteryPill" title="Battery">
+        <i class="fa-solid fa-battery-three-quarters" id="batteryIcon"></i>
+        <span id="batteryText">87%</span>
+      </div>
+      <!-- Timestamp -->
+      <div class="status-pill last-seen" title="Last Update">
+        <i class="fa-regular fa-clock"></i>
+        <span id="lastSeen">just now</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== RIDER PROFILE STRIP ===================== -->
+  <section class="rider-strip" id="riderStrip">
+    <div class="rider-avatar">
+      <i class="fa-solid fa-user-helmet-safety"></i>
+    </div>
+    <div class="rider-info">
+      <div class="rider-name">JUAN DELA CRUZ</div>
+      <div class="rider-meta"><span class="blood-badge">B+</span> Hypertension · No known allergies</div>
+    </div>
+    <div class="ride-status-badge" id="rideStatusBadge">
+      <span class="pulse-dot"></span>RIDING
+    </div>
+  </section>
+
+  <!-- ===================== MAIN SCROLL CONTAINER ===================== -->
+  <main class="main-scroll" id="mainScroll">
+
+    <!-- ===== ALCOHOL / RIDE READINESS (top card – most critical) ===== -->
+    <section class="card alcohol-card" id="alcoholCard">
+      <div class="card-header">
+        <i class="fa-solid fa-wine-bottle"></i>
+        <span>RIDE READINESS</span>
+        <span class="sensor-label">MQ3 SENSOR</span>
+      </div>
+      <div class="alcohol-status" id="alcoholStatus">
+        <div class="alcohol-badge safe" id="alcoholBadge">
+          <i class="fa-solid fa-circle-check"></i>
+          <span id="alcoholLabel">SAFE TO RIDE</span>
+        </div>
+        <div class="alcohol-meter">
+          <div class="meter-bar">
+            <div class="meter-fill" id="alcoholMeterFill" style="width:12%"></div>
+          </div>
+          <div class="meter-labels">
+            <span>0.00</span><span>BAC</span><span id="alcoholBac">0.02%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== IMPACT & MOTION (MPU6050) ===== -->
+    <section class="card motion-card" id="motionCard">
+      <div class="card-header">
+        <i class="fa-solid fa-wave-square"></i>
+        <span>IMPACT & MOTION</span>
+        <span class="sensor-label">MPU6050</span>
+      </div>
+      <div class="gforce-display">
+        <div class="gforce-value" id="gforceVal">0.98<span>G</span></div>
+        <div class="gforce-status" id="gforceStatus">Normal</div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="gforceChart" height="90"></canvas>
+      </div>
+      <div class="motion-metrics">
+        <div class="metric-chip">
+          <span class="metric-label">MAX</span>
+          <span class="metric-val" id="maxG">1.02G</span>
+        </div>
+        <div class="metric-chip">
+          <span class="metric-label">AVG</span>
+          <span class="metric-val" id="avgG">0.99G</span>
+        </div>
+        <div class="metric-chip">
+          <span class="metric-label">SPIKES</span>
+          <span class="metric-val" id="spikeCount">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ORIENTATION INDICATOR ===== -->
+    <section class="card orientation-card" id="orientationCard">
+      <div class="card-header">
+        <i class="fa-solid fa-compass"></i>
+        <span>ORIENTATION</span>
+        <span class="sensor-label">GYRO</span>
+      </div>
+      <div class="orientation-layout">
+        <div class="compass-wrap">
+          <canvas id="compassCanvas" width="130" height="130"></canvas>
+        </div>
+        <div class="orientation-vals">
+          <div class="orient-row">
+            <span class="orient-label">PITCH</span>
+            <span class="orient-val" id="pitchVal">+2.4°</span>
+            <div class="orient-bar-wrap"><div class="orient-bar pitch-bar" id="pitchBar" style="width:52%"></div></div>
+          </div>
+          <div class="orient-row">
+            <span class="orient-label">ROLL</span>
+            <span class="orient-val" id="rollVal">-1.1°</span>
+            <div class="orient-bar-wrap"><div class="orient-bar roll-bar" id="rollBar" style="width:49%"></div></div>
+          </div>
+          <div class="orient-row">
+            <span class="orient-label">YAW</span>
+            <span class="orient-val" id="yawVal">178°</span>
+            <div class="orient-bar-wrap"><div class="orient-bar yaw-bar" id="yawBar" style="width:49%"></div></div>
+          </div>
+          <div class="fall-risk" id="fallRisk">
+            <i class="fa-solid fa-person-falling-burst"></i>
+            <span>FALL RISK: <strong id="fallRiskLevel">LOW</strong></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== LIVE GPS MAP ===== -->
+    <section class="card map-card" id="mapCard">
+      <div class="card-header">
+        <i class="fa-solid fa-map-location-dot"></i>
+        <span>LIVE LOCATION</span>
+        <span class="sensor-label">NEO-M6</span>
+      </div>
+      <div class="map-coords">
+        <span id="coordLat">14.5995° N</span>
+        <span class="coord-divider">|</span>
+        <span id="coordLng">120.9842° E</span>
+        <span class="coord-divider">|</span>
+        <span id="coordSpeed"><i class="fa-solid fa-gauge"></i> 42 km/h</span>
+      </div>
+      <div class="map-container" id="mapContainer">
+        <div id="leafletMap"></div>
+        <button class="map-expand-btn" id="mapExpandBtn" aria-label="Expand map">
+          <i class="fa-solid fa-expand"></i>
+        </button>
+        <div class="geofence-status" id="geofenceStatus">
+          <i class="fa-solid fa-draw-polygon"></i> INSIDE ZONE
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BATTERY CARD ===== -->
+    <section class="card battery-card" id="batteryCard">
+      <div class="card-header">
+        <i class="fa-solid fa-charging-station"></i>
+        <span>POWER STATUS</span>
+        <span class="sensor-label">TP4056</span>
+      </div>
+      <div class="battery-layout">
+        <div class="battery-visual" id="batteryVisual">
+          <div class="battery-body">
+            <div class="battery-fill" id="batteryFill" style="width:87%"></div>
+            <span class="battery-pct" id="batteryPct">87%</span>
+          </div>
+          <div class="battery-tip"></div>
+        </div>
+        <div class="battery-stats">
+          <div class="bstat"><span class="bstat-label">VOLTAGE</span><span class="bstat-val" id="battVoltage">3.92V</span></div>
+          <div class="bstat"><span class="bstat-label">CURRENT</span><span class="bstat-val" id="battCurrent">142mA</span></div>
+          <div class="bstat"><span class="bstat-label">EST. LIFE</span><span class="bstat-val" id="battLife">4h 20m</span></div>
+          <div class="bstat"><span class="bstat-label">STATUS</span><span class="bstat-val green" id="battStatus">GOOD</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== INCIDENT LOG ===== -->
+    <section class="card log-card" id="logCard">
+      <div class="card-header">
+        <i class="fa-solid fa-list-check"></i>
+        <span>INCIDENT LOG</span>
+        <span class="log-count" id="logCount">3</span>
+      </div>
+      <div class="incident-list" id="incidentList">
+        <!-- Populated by JS -->
+      </div>
+    </section>
+
+    <!-- Spacer so FAB doesn't overlap content -->
+    <div style="height: 120px;"></div>
+  </main>
+
+  <!-- ===================== FLOATING SOS BUTTON ===================== -->
+  <div class="sos-fab-wrap" id="sosFabWrap">
+    <button class="sos-fab" id="sosFab" aria-label="Send SOS Emergency Alert">
+      <span class="sos-ring sos-ring-1"></span>
+      <span class="sos-ring sos-ring-2"></span>
+      <i class="fa-solid fa-bell-exclamation"></i>
+      <span>SOS</span>
+    </button>
+  </div>
+
+  <!-- ===================== EMERGENCY OVERLAY ===================== -->
+  <div class="emergency-overlay hidden" id="emergencyOverlay">
+    <div class="emergency-panel">
+      <div class="emergency-header">
+        <div class="emergency-icon-wrap">
+          <i class="fa-solid fa-triangle-exclamation" id="emergencyTypeIcon"></i>
+        </div>
+        <div class="emergency-title-wrap">
+          <div class="emergency-type" id="emergencyType">FALL DETECTED</div>
+          <div class="emergency-time" id="emergencyTime">Just now</div>
+        </div>
+        <button class="emergency-dismiss" id="emergencyDismiss" aria-label="Dismiss">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="rider-emergency-info">
+        <div class="rei-row">
+          <span class="rei-label">RIDER</span>
+          <span class="rei-val">Juan Dela Cruz</span>
+        </div>
+        <div class="rei-row">
+          <span class="rei-label">BLOOD TYPE</span>
+          <span class="rei-val blood-type">B+</span>
+        </div>
+        <div class="rei-row">
+          <span class="rei-label">CONDITIONS</span>
+          <span class="rei-val">Hypertension</span>
+        </div>
+        <div class="rei-row">
+          <span class="rei-label">LOCATION</span>
+          <span class="rei-val" id="emergencyLocation">14.5995°N, 120.9842°E</span>
+        </div>
+      </div>
+      <div class="emergency-contacts">
+        <div class="ec-title">EMERGENCY CONTACTS</div>
+        <a class="ec-card" href="tel:+639171234567">
+          <div class="ec-avatar ec-1"><i class="fa-solid fa-user"></i></div>
+          <div class="ec-info"><span class="ec-name">Maria Dela Cruz</span><span class="ec-rel">Spouse</span></div>
+          <div class="ec-call"><i class="fa-solid fa-phone"></i></div>
+        </a>
+        <a class="ec-card" href="tel:+639289876543">
+          <div class="ec-avatar ec-2"><i class="fa-solid fa-user-doctor"></i></div>
+          <div class="ec-info"><span class="ec-name">Dr. Santos</span><span class="ec-rel">Physician</span></div>
+          <div class="ec-call"><i class="fa-solid fa-phone"></i></div>
+        </a>
+        <a class="ec-card" href="tel:+63911">
+          <div class="ec-avatar ec-3"><i class="fa-solid fa-truck-medical"></i></div>
+          <div class="ec-info"><span class="ec-name">Emergency 911</span><span class="ec-rel">National Emergency</span></div>
+          <div class="ec-call ec-call-red"><i class="fa-solid fa-phone"></i></div>
+        </a>
+      </div>
+      <div class="sms-status" id="smsStatus">
+        <i class="fa-solid fa-paper-plane"></i>
+        <span id="smsStatusText">Sending SMS via SIM800L...</span>
+      </div>
+      <button class="emergency-cancel-btn" id="emergencyCancelBtn">
+        <i class="fa-solid fa-shield-check"></i> MARK AS FALSE ALARM
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== MAP FULLSCREEN OVERLAY ===================== -->
+  <div class="map-fullscreen hidden" id="mapFullscreen">
+    <div class="map-fs-header">
+      <span><i class="fa-solid fa-map-location-dot"></i> LIVE TRACKING</span>
+      <button class="map-fs-close" id="mapFsClose"><i class="fa-solid fa-compress"></i></button>
+    </div>
+    <div id="fullscreenMap" style="width:100%;height:calc(100% - 52px);"></div>
+  </div>
+
+  <!-- ===================== TOAST CONTAINER ===================== -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="script.js"></script>
+  <script>
+    // Simple splash overlay hide logic: show on load, then fade after a short delay
+    (function() {
+      function hideSplash() {
+        const s = document.getElementById('splashOverlay');
+        if (!s) return;
+        s.classList.add('splash-hidden');
+        // Remove from DOM after transition to keep things clean
+        s.addEventListener('transitionend', () => { s.remove(); }, { once: true });
+      }
+
+      // Wait for window load to ensure assets are ready, then hide splash
+      window.addEventListener('load', () => {
+          // keep splash visible for about 3 seconds so users can see the logo
+          const MIN_VISIBLE = 3000; // ms
+          // add a short extra buffer to allow the fade-out animation to run
+          setTimeout(hideSplash, MIN_VISIBLE + 420);
+      });
+    })();
+  </script>
+</body>
+</html>
